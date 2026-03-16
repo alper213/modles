@@ -1,5 +1,5 @@
 -- ==============================================================================
--- KRAL PREMIUM UI LIBRARY - UNIVERSAL INJECTOR EDITION
+-- KRAL PREMIUM UI LIBRARY - V9 ULTIMATE EDITION (LIVE WM & DROPDOWN FIX)
 -- ==============================================================================
 local Library = {}
 local Players = game:GetService("Players")
@@ -35,14 +35,14 @@ function Library:CreateWindow(title, wmText)
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "KralPremiumLib"
     ScreenGui.Parent = TargetParent
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- Helps with Dropdown ZIndex
 
     function WindowData:Unload()
         ScreenGui:Destroy()
     end
 
     -- ========================================================
-    -- WATERMARK
+    -- LIVE WATERMARK
     -- ========================================================
     local WatermarkBG = Instance.new("Frame")
     WatermarkBG.AutomaticSize = Enum.AutomaticSize.X
@@ -75,6 +75,19 @@ function Library:CreateWindow(title, wmText)
     WMTextLabel.Font = Enum.Font.Code
     WMTextLabel.TextSize = 12
     WMTextLabel.Parent = WatermarkBG
+
+    -- Live Update Logic for Watermark
+    local frames = 0
+    RunService.RenderStepped:Connect(function() frames = frames + 1 end)
+    task.spawn(function()
+        local baseText = wmText or "Kral Premium UI"
+        while task.wait(1) do
+            if not ScreenGui.Parent then break end -- Stop loop if UI is destroyed
+            local timeStr = os.date("%H:%M:%S")
+            WMTextLabel.Text = string.format("%s | %s | %d FPS", baseText, timeStr, frames)
+            frames = 0
+        end
+    end)
 
     -- ========================================================
     -- KEYBIND LIST
@@ -193,6 +206,9 @@ function Library:CreateWindow(title, wmText)
     ContentArea.Parent = MainFrame
     Instance.new("UIStroke", ContentArea).Color = Theme.Border
 
+    -- Global variable for managing open dropdowns
+    local ActiveDropdown = nil
+
     function WindowData:CreateTab(tabName)
         local TabData = {}
         
@@ -276,12 +292,12 @@ function Library:CreateWindow(title, wmText)
             GBBlueLine.Parent = GroupBox
             
             local TitleContainer = Instance.new("Frame")
-            TitleContainer.Position = UDim2.new(0, 10, 0, -2) -- <-- POSITION: -2 makes it perfectly flush. Change to 0 to go even lower.
+            TitleContainer.Position = UDim2.new(0, 10, 0, -2) 
             TitleContainer.Size = UDim2.new(0, 0, 0, 14) 
             TitleContainer.AutomaticSize = Enum.AutomaticSize.X 
             TitleContainer.BackgroundColor3 = Theme.DarkBG
             TitleContainer.BorderSizePixel = 0
-            TitleContainer.ZIndex = 5 -- <-- Keeps the background above the blue line
+            TitleContainer.ZIndex = 5 
             TitleContainer.Parent = GroupBox
 
             local GBTitle = Instance.new("TextLabel")
@@ -292,7 +308,7 @@ function Library:CreateWindow(title, wmText)
             GBTitle.Font = Enum.Font.Code
             GBTitle.TextSize = 12
             GBTitle.TextYAlignment = Enum.TextYAlignment.Center 
-            GBTitle.ZIndex = 6 -- <-- Keeps the text BRIGHT and above everything
+            GBTitle.ZIndex = 6
             GBTitle.Parent = TitleContainer
 
             local ItemContainer = Instance.new("Frame")
@@ -312,7 +328,7 @@ function Library:CreateWindow(title, wmText)
             Padding.PaddingBottom = UDim.new(0, 8)
             Padding.Parent = ItemContainer
 
-            -- ==================== LABEL ====================
+            -- ==================== ELEMENTS ====================
             function GBData:CreateLabel(text)
                 local Lbl = Instance.new("TextLabel")
                 Lbl.Size = UDim2.new(1, 0, 0, 14)
@@ -325,7 +341,6 @@ function Library:CreateWindow(title, wmText)
                 Lbl.Parent = ItemContainer
             end
 
-            -- ==================== BUTTON ====================
             function GBData:CreateButton(options)
                 local name = options.Name or "Button"
                 local callback = options.Callback or function() end
@@ -343,13 +358,9 @@ function Library:CreateWindow(title, wmText)
 
                 Btn.MouseEnter:Connect(function() Btn.TextColor3 = Theme.Accent end)
                 Btn.MouseLeave:Connect(function() Btn.TextColor3 = Theme.Text end)
-                -- PCALL ADDED: Protects UI from breaking if user code errors
-                Btn.MouseButton1Click:Connect(function()
-                    pcall(callback)
-                end)
+                Btn.MouseButton1Click:Connect(function() pcall(callback) end)
             end
 
-            -- ==================== TEXTBOX (NEW) ====================
             function GBData:CreateTextBox(options)
                 local name = options.Name or "TextBox"
                 local placeholder = options.Placeholder or "Type here..."
@@ -389,12 +400,10 @@ function Library:CreateWindow(title, wmText)
                 PaddingBox.Parent = InputBox
 
                 InputBox.FocusLost:Connect(function(enterPressed)
-                    -- PCALL ADDED
                     pcall(callback, InputBox.Text)
                 end)
             end
 
-            -- ==================== TOGGLE ====================
             function GBData:CreateToggle(options)
                 local name = options.Name or "Toggle"
                 local state = options.Default or false
@@ -435,7 +444,6 @@ function Library:CreateWindow(title, wmText)
                     state = not state
                     CheckBox.BackgroundColor3 = state and Theme.Accent or Theme.ItemBG
                     if bind then UpdateKeybindList(name, bind, state) end
-                    -- PCALL ADDED
                     pcall(callback, state)
                 end
 
@@ -480,7 +488,6 @@ function Library:CreateWindow(title, wmText)
                 end
             end
 
-            -- ==================== SLIDER ====================
             function GBData:CreateSlider(options)
                 local name = options.Name or "Slider"
                 local min = options.Min or 0
@@ -552,14 +559,14 @@ function Library:CreateWindow(title, wmText)
                         local formatString = (increment % 1 == 0) and "%d/%d" or "%.1f/%.1f"
                         ValLabel.Text = string.format(formatString, val, max)
                         
-                        -- PCALL ADDED
                         pcall(callback, val)
                     end
                 end)
             end
 
-            -- ==================== DROPDOWN ====================
+            -- ==================== FIXED DROPDOWN (ZIndex + Refresh) ====================
             function GBData:CreateDropdown(options)
+                local DropData = {}
                 local name = options.Name or "Dropdown"
                 local list = options.Options or {}
                 local callback = options.Callback or function() end
@@ -567,6 +574,7 @@ function Library:CreateWindow(title, wmText)
                 local DropContainer = Instance.new("Frame")
                 DropContainer.Size = UDim2.new(1, 0, 0, 35)
                 DropContainer.BackgroundTransparency = 1
+                DropContainer.ZIndex = 5
                 DropContainer.Parent = ItemContainer
 
                 local Lbl = Instance.new("TextLabel")
@@ -577,6 +585,7 @@ function Library:CreateWindow(title, wmText)
                 Lbl.Font = Enum.Font.Code
                 Lbl.TextSize = 12
                 Lbl.TextXAlignment = Enum.TextXAlignment.Left
+                Lbl.ZIndex = 5
                 Lbl.Parent = DropContainer
 
                 local MainBtn = Instance.new("TextButton")
@@ -589,6 +598,7 @@ function Library:CreateWindow(title, wmText)
                 MainBtn.Font = Enum.Font.Code
                 MainBtn.TextSize = 12
                 MainBtn.TextXAlignment = Enum.TextXAlignment.Left
+                MainBtn.ZIndex = 5
                 MainBtn.Parent = DropContainer
                 Instance.new("UIStroke", MainBtn).Color = Theme.Border
 
@@ -599,53 +609,75 @@ function Library:CreateWindow(title, wmText)
                 Arrow.Text = "▼"
                 Arrow.TextColor3 = Theme.Text
                 Arrow.TextSize = 8
+                Arrow.ZIndex = 5
                 Arrow.Parent = MainBtn
 
-                local DropFrame = Instance.new("Frame")
-                DropFrame.Size = UDim2.new(1, 0, 0, #list * 18)
+                local DropFrame = Instance.new("ScrollingFrame")
+                DropFrame.Size = UDim2.new(1, 0, 0, 0)
                 DropFrame.Position = UDim2.new(0, 0, 1, 2)
                 DropFrame.BackgroundColor3 = Theme.ItemBG
                 DropFrame.BorderSizePixel = 0
                 DropFrame.Visible = false
-                DropFrame.ZIndex = 10 
+                DropFrame.ZIndex = 100 -- Always on top when open
+                DropFrame.ScrollBarThickness = 2
                 DropFrame.Parent = MainBtn
                 Instance.new("UIStroke", DropFrame).Color = Theme.Border
                 
                 local DropLayout = Instance.new("UIListLayout")
                 DropLayout.Parent = DropFrame
 
-                local isOpen = false
-                MainBtn.MouseButton1Click:Connect(function()
-                    isOpen = not isOpen
-                    DropFrame.Visible = isOpen
-                    Arrow.Text = isOpen and "▲" or "▼"
-                end)
+                function DropData:Refresh(newList)
+                    for _, child in pairs(DropFrame:GetChildren()) do
+                        if child:IsA("TextButton") then child:Destroy() end
+                    end
+                    
+                    local count = #newList
+                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(count * 18, 0, 108)) -- Max 6 items visible
+                    DropFrame.CanvasSize = UDim2.new(0, 0, 0, count * 18)
+                    MainBtn.Text = " " .. (newList[1] or "...")
 
-                for _, optionText in pairs(list) do
-                    local OptBtn = Instance.new("TextButton")
-                    OptBtn.Size = UDim2.new(1, 0, 0, 18)
-                    OptBtn.BackgroundColor3 = Theme.ItemBG
-                    OptBtn.BorderSizePixel = 0
-                    OptBtn.Text = " " .. optionText
-                    OptBtn.TextColor3 = Theme.Text
-                    OptBtn.Font = Enum.Font.Code
-                    OptBtn.TextSize = 12
-                    OptBtn.TextXAlignment = Enum.TextXAlignment.Left
-                    OptBtn.ZIndex = 11
-                    OptBtn.Parent = DropFrame
-                    
-                    OptBtn.MouseEnter:Connect(function() OptBtn.TextColor3 = Theme.Accent end)
-                    OptBtn.MouseLeave:Connect(function() OptBtn.TextColor3 = Theme.Text end)
-                    
-                    OptBtn.MouseButton1Click:Connect(function()
-                        MainBtn.Text = " " .. optionText
-                        isOpen = false
-                        DropFrame.Visible = false
-                        Arrow.Text = "▼"
-                        -- PCALL ADDED
-                        pcall(callback, optionText)
-                    end)
+                    for _, optionText in pairs(newList) do
+                        local OptBtn = Instance.new("TextButton")
+                        OptBtn.Size = UDim2.new(1, 0, 0, 18)
+                        OptBtn.BackgroundColor3 = Theme.ItemBG
+                        OptBtn.BorderSizePixel = 0
+                        OptBtn.Text = " " .. optionText
+                        OptBtn.TextColor3 = Theme.Text
+                        OptBtn.Font = Enum.Font.Code
+                        OptBtn.TextSize = 12
+                        OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+                        OptBtn.ZIndex = 101
+                        OptBtn.Parent = DropFrame
+                        
+                        OptBtn.MouseEnter:Connect(function() OptBtn.TextColor3 = Theme.Accent end)
+                        OptBtn.MouseLeave:Connect(function() OptBtn.TextColor3 = Theme.Text end)
+                        
+                        OptBtn.MouseButton1Click:Connect(function()
+                            MainBtn.Text = " " .. optionText
+                            DropFrame.Visible = false
+                            DropContainer.ZIndex = 5
+                            Arrow.Text = "▼"
+                            ActiveDropdown = nil
+                            pcall(callback, optionText)
+                        end)
+                    end
                 end
+
+                DropData:Refresh(list)
+
+                MainBtn.MouseButton1Click:Connect(function()
+                    local opening = not DropFrame.Visible
+                    if ActiveDropdown and ActiveDropdown ~= DropFrame then
+                        ActiveDropdown.Visible = false
+                        ActiveDropdown.Parent.Parent.ZIndex = 5
+                    end
+                    DropFrame.Visible = opening
+                    DropContainer.ZIndex = opening and 50 or 5
+                    Arrow.Text = opening and "▲" or "▼"
+                    ActiveDropdown = opening and DropFrame or nil
+                end)
+                
+                return DropData
             end
 
             -- ==================== COLOR PICKER ====================
@@ -684,7 +716,7 @@ function Library:CreateWindow(title, wmText)
                 Popup.BackgroundColor3 = Theme.ItemBG
                 Popup.BorderSizePixel = 0
                 Popup.Visible = false
-                Popup.ZIndex = 8
+                Popup.ZIndex = 80
                 Popup.Parent = CPContainer
                 Instance.new("UIStroke", Popup).Color = Theme.Border
 
@@ -704,6 +736,7 @@ function Library:CreateWindow(title, wmText)
                 ColorDisplay.MouseButton1Click:Connect(function()
                     isOpen = not isOpen
                     Popup.Visible = isOpen
+                    CPContainer.ZIndex = isOpen and 75 or 1
                     UpdateCanvas()
                 end)
 
@@ -714,14 +747,14 @@ function Library:CreateWindow(title, wmText)
                 SatValGrid.BackgroundColor3 = Color3.fromHSV(currentHSV[1], 1, 1)
                 SatValGrid.Image = "rbxassetid://4155801252"
                 SatValGrid.AutoButtonColor = false
-                SatValGrid.ZIndex = 9
+                SatValGrid.ZIndex = 81
                 SatValGrid.Parent = Popup
                 
                 local SVIndicator = Instance.new("Frame")
                 SVIndicator.Size = UDim2.new(0, 6, 0, 6)
                 SVIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
                 SVIndicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                SVIndicator.ZIndex = 10
+                SVIndicator.ZIndex = 82
                 SVIndicator.Parent = SatValGrid
                 Instance.new("UICorner", SVIndicator).CornerRadius = UDim.new(1, 0)
                 Instance.new("UIStroke", SVIndicator).Color = Color3.fromRGB(0, 0, 0)
@@ -731,7 +764,7 @@ function Library:CreateWindow(title, wmText)
                 HueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                 HueBar.Text = ""
                 HueBar.AutoButtonColor = false
-                HueBar.ZIndex = 9
+                HueBar.ZIndex = 81
                 HueBar.Parent = Popup
                 
                 local Gradient = Instance.new("UIGradient")
@@ -751,7 +784,7 @@ function Library:CreateWindow(title, wmText)
                 HueIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
                 HueIndicator.Position = UDim2.new(0, 0, 0.5, 0)
                 HueIndicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                HueIndicator.ZIndex = 10
+                HueIndicator.ZIndex = 82
                 HueIndicator.Parent = HueBar
                 Instance.new("UIStroke", HueIndicator).Color = Color3.fromRGB(0, 0, 0)
 
@@ -762,7 +795,6 @@ function Library:CreateWindow(title, wmText)
                     
                     SVIndicator.Position = UDim2.new(currentHSV[2], 0, 1 - currentHSV[3], 0)
                     HueIndicator.Position = UDim2.new(currentHSV[1], 0, 0.5, 0)
-                    -- PCALL ADDED
                     pcall(callback, col)
                 end
 
@@ -865,12 +897,10 @@ function Library:CreateWindow(title, wmText)
                         else
                             bind = input.KeyCode.Name
                             BindBtn.Text = "[" .. bind .. "]"
-                            -- PCALL ADDED
                             pcall(callback, bind)
                         end
                         isListening = false
                     elseif not gameProcessed and not isListening and bind and input.KeyCode.Name == bind then
-                        -- PCALL ADDED
                         pcall(callback, bind)
                     end
                 end)
@@ -880,7 +910,7 @@ function Library:CreateWindow(title, wmText)
         end
         return TabData
     end
-return WindowData
+    return WindowData
 end
 
-return Library -- <-- EN DIŞARIDAKİ BU SATIR ŞART
+return Library
