@@ -882,4 +882,4 @@ function Library:CreateWindow(title, wmText)
     end
     return WindowData
 end
-
+return Library
