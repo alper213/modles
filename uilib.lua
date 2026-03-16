@@ -1,5 +1,5 @@
 -- ==============================================================================
--- KRAL PREMIUM UI LIBRARY - V9 ULTIMATE EDITION (LIVE WM & DROPDOWN FIX)
+-- KRAL PREMIUM UI LIBRARY - V10 (DROPDOWN SET & REFRESH UPDATE)
 -- ==============================================================================
 local Library = {}
 local Players = game:GetService("Players")
@@ -35,7 +35,7 @@ function Library:CreateWindow(title, wmText)
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "KralPremiumLib"
     ScreenGui.Parent = TargetParent
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- Helps with Dropdown ZIndex
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global 
 
     function WindowData:Unload()
         ScreenGui:Destroy()
@@ -76,13 +76,12 @@ function Library:CreateWindow(title, wmText)
     WMTextLabel.TextSize = 12
     WMTextLabel.Parent = WatermarkBG
 
-    -- Live Update Logic for Watermark
     local frames = 0
     RunService.RenderStepped:Connect(function() frames = frames + 1 end)
     task.spawn(function()
         local baseText = wmText or "Kral Premium UI"
         while task.wait(1) do
-            if not ScreenGui.Parent then break end -- Stop loop if UI is destroyed
+            if not ScreenGui.Parent then break end 
             local timeStr = os.date("%H:%M:%S")
             WMTextLabel.Text = string.format("%s | %s | %d FPS", baseText, timeStr, frames)
             frames = 0
@@ -206,7 +205,6 @@ function Library:CreateWindow(title, wmText)
     ContentArea.Parent = MainFrame
     Instance.new("UIStroke", ContentArea).Color = Theme.Border
 
-    -- Global variable for managing open dropdowns
     local ActiveDropdown = nil
 
     function WindowData:CreateTab(tabName)
@@ -328,7 +326,7 @@ function Library:CreateWindow(title, wmText)
             Padding.PaddingBottom = UDim.new(0, 8)
             Padding.Parent = ItemContainer
 
-            -- ==================== ELEMENTS ====================
+            -- ==================== LABEL ====================
             function GBData:CreateLabel(text)
                 local Lbl = Instance.new("TextLabel")
                 Lbl.Size = UDim2.new(1, 0, 0, 14)
@@ -341,6 +339,7 @@ function Library:CreateWindow(title, wmText)
                 Lbl.Parent = ItemContainer
             end
 
+            -- ==================== BUTTON ====================
             function GBData:CreateButton(options)
                 local name = options.Name or "Button"
                 local callback = options.Callback or function() end
@@ -361,6 +360,7 @@ function Library:CreateWindow(title, wmText)
                 Btn.MouseButton1Click:Connect(function() pcall(callback) end)
             end
 
+            -- ==================== TEXTBOX ====================
             function GBData:CreateTextBox(options)
                 local name = options.Name or "TextBox"
                 local placeholder = options.Placeholder or "Type here..."
@@ -404,6 +404,7 @@ function Library:CreateWindow(title, wmText)
                 end)
             end
 
+            -- ==================== TOGGLE ====================
             function GBData:CreateToggle(options)
                 local name = options.Name or "Toggle"
                 local state = options.Default or false
@@ -488,6 +489,7 @@ function Library:CreateWindow(title, wmText)
                 end
             end
 
+            -- ==================== SLIDER ====================
             function GBData:CreateSlider(options)
                 local name = options.Name or "Slider"
                 local min = options.Min or 0
@@ -564,7 +566,7 @@ function Library:CreateWindow(title, wmText)
                 end)
             end
 
-            -- ==================== FIXED DROPDOWN (ZIndex + Refresh) ====================
+            -- ==================== DROPDOWN (WITH SET & REFRESH) ====================
             function GBData:CreateDropdown(options)
                 local DropData = {}
                 local name = options.Name or "Dropdown"
@@ -618,7 +620,7 @@ function Library:CreateWindow(title, wmText)
                 DropFrame.BackgroundColor3 = Theme.ItemBG
                 DropFrame.BorderSizePixel = 0
                 DropFrame.Visible = false
-                DropFrame.ZIndex = 100 -- Always on top when open
+                DropFrame.ZIndex = 100 
                 DropFrame.ScrollBarThickness = 2
                 DropFrame.Parent = MainBtn
                 Instance.new("UIStroke", DropFrame).Color = Theme.Border
@@ -632,7 +634,7 @@ function Library:CreateWindow(title, wmText)
                     end
                     
                     local count = #newList
-                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(count * 18, 0, 108)) -- Max 6 items visible
+                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(count * 18, 0, 108)) 
                     DropFrame.CanvasSize = UDim2.new(0, 0, 0, count * 18)
                     MainBtn.Text = " " .. (newList[1] or "...")
 
@@ -661,6 +663,11 @@ function Library:CreateWindow(title, wmText)
                             pcall(callback, optionText)
                         end)
                     end
+                end
+
+                function DropData:Set(newValue)
+                    MainBtn.Text = " " .. tostring(newValue)
+                    pcall(callback, newValue)
                 end
 
                 DropData:Refresh(list)
