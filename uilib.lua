@@ -880,6 +880,7 @@ function Library:CreateWindow(title, wmText)
         end
         return TabData
     end
-    return WindowData
+return WindowData
 end
-return Library
+
+return Library -- <-- EN DIŞARIDAKİ BU SATIR ŞART
