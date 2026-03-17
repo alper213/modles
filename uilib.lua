@@ -1,12 +1,12 @@
 -- ==============================================================================
--- KRAL PREMIUM UI LIBRARY - V10 (DROPDOWN SET & REFRESH UPDATE)
+-- KRAL PREMIUM UI LIBRARY - V11 (MOBILE SUPPORT + ALL ELEMENTS RESTORED)
 -- ==============================================================================
 local Library = {}
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
--- Universal GUI Parent Logic (Works on ALL Exploit Executors)
+-- Universal GUI Parent Logic (Hidden from the game)
 local TargetParent
 local success = pcall(function() TargetParent = gethui and gethui() or game:GetService("CoreGui") end)
 if not success or not TargetParent then
@@ -22,6 +22,9 @@ local Theme = {
     ItemBG = Color3.fromRGB(30, 30, 30)
 }
 
+-- Detect Mobile Device
+local isMobile = UIS.TouchEnabled and not UIS.MouseEnabled
+
 -- Destroy old UI if it exists
 for _, v in pairs(TargetParent:GetChildren()) do
     if v.Name == "KralPremiumLib" then v:Destroy() end
@@ -36,9 +39,36 @@ function Library:CreateWindow(title, wmText)
     ScreenGui.Name = "KralPremiumLib"
     ScreenGui.Parent = TargetParent
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global 
+    ScreenGui.ResetOnSpawn = false
 
     function WindowData:Unload()
         ScreenGui:Destroy()
+    end
+
+    -- ========================================================
+    -- MOBILE TOGGLE BUTTON (HIDDEN FROM GAME)
+    -- ========================================================
+    local MobileToggleBtn = nil
+    if isMobile then
+        MobileToggleBtn = Instance.new("TextButton")
+        MobileToggleBtn.Name = "MobileToggle"
+        MobileToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+        MobileToggleBtn.Position = UDim2.new(1, -70, 0, 15)
+        MobileToggleBtn.BackgroundColor3 = Theme.DarkBG
+        MobileToggleBtn.TextColor3 = Theme.Accent
+        MobileToggleBtn.Font = Enum.Font.Code
+        MobileToggleBtn.TextSize = 13
+        MobileToggleBtn.Text = "MENU"
+        MobileToggleBtn.BorderSizePixel = 0
+        MobileToggleBtn.Active = true
+        MobileToggleBtn.Draggable = true 
+        MobileToggleBtn.Parent = ScreenGui
+        
+        local MTCircular = Instance.new("UICorner")
+        MTCircular.CornerRadius = UDim.new(0, 8)
+        MTCircular.Parent = MobileToggleBtn
+        
+        Instance.new("UIStroke", MobileToggleBtn).Color = Theme.Border
     end
 
     -- ========================================================
@@ -98,6 +128,7 @@ function Library:CreateWindow(title, wmText)
     KeybindListBG.BorderSizePixel = 0
     KeybindListBG.Active = true
     KeybindListBG.Draggable = true
+    KeybindListBG.Visible = not isMobile 
     KeybindListBG.Parent = ScreenGui
     Instance.new("UIStroke", KeybindListBG).Color = Theme.Border
 
@@ -133,6 +164,7 @@ function Library:CreateWindow(title, wmText)
 
     local activeKeybinds = {}
     local function UpdateKeybindList(name, key, state)
+        if isMobile then return end 
         if not key or key == "" then return end
         if not activeKeybinds[name] then
             local item = Instance.new("TextLabel")
@@ -161,12 +193,23 @@ function Library:CreateWindow(title, wmText)
     MainFrame.Draggable = true
     MainFrame.Parent = ScreenGui
     Instance.new("UIStroke", MainFrame).Color = Theme.Border
+    
+    if isMobile then
+        MainFrame.Size = UDim2.new(0, 450, 0, 350)
+        MainFrame.Position = UDim2.new(0.5, -225, 0.5, -175)
+    end
 
     UIS.InputBegan:Connect(function(input, gameProcessed)
         if not gameProcessed and input.KeyCode == WindowData.MenuBind then
             MainFrame.Visible = not MainFrame.Visible
         end
     end)
+    
+    if isMobile and MobileToggleBtn then
+        MobileToggleBtn.Activated:Connect(function()
+            MainFrame.Visible = not MainFrame.Visible
+        end)
+    end
 
     local TitleBar = Instance.new("Frame")
     TitleBar.Size = UDim2.new(1, 0, 0, 25)
@@ -357,7 +400,13 @@ function Library:CreateWindow(title, wmText)
 
                 Btn.MouseEnter:Connect(function() Btn.TextColor3 = Theme.Accent end)
                 Btn.MouseLeave:Connect(function() Btn.TextColor3 = Theme.Text end)
-                Btn.MouseButton1Click:Connect(function() pcall(callback) end)
+                
+                Btn.Activated:Connect(function() 
+                    local success, err = pcall(callback)
+                    if not success then
+                        warn("[Kral UI Error] Button '" .. name .. "' failed: " .. tostring(err))
+                    end
+                end)
             end
 
             -- ==================== TEXTBOX ====================
@@ -400,7 +449,8 @@ function Library:CreateWindow(title, wmText)
                 PaddingBox.Parent = InputBox
 
                 InputBox.FocusLost:Connect(function(enterPressed)
-                    pcall(callback, InputBox.Text)
+                    local s, e = pcall(callback, InputBox.Text)
+                    if not s then warn("[Kral UI Error] TextBox failed:", e) end
                 end)
             end
 
@@ -417,7 +467,7 @@ function Library:CreateWindow(title, wmText)
                 TContainer.Parent = ItemContainer
 
                 local MainBtn = Instance.new("TextButton")
-                MainBtn.Size = bind and UDim2.new(1, -40, 1, 0) or UDim2.new(1, 0, 1, 0)
+                MainBtn.Size = (bind and not isMobile) and UDim2.new(1, -40, 1, 0) or UDim2.new(1, 0, 1, 0)
                 MainBtn.BackgroundTransparency = 1
                 MainBtn.Text = ""
                 MainBtn.Parent = TContainer
@@ -445,15 +495,16 @@ function Library:CreateWindow(title, wmText)
                     state = not state
                     CheckBox.BackgroundColor3 = state and Theme.Accent or Theme.ItemBG
                     if bind then UpdateKeybindList(name, bind, state) end
-                    pcall(callback, state)
+                    local s, e = pcall(callback, state)
+                    if not s then warn("[Kral UI Error] Toggle failed:", e) end
                 end
 
                 if bind then UpdateKeybindList(name, bind, state) end
                 if state then pcall(callback, state) end
 
-                MainBtn.MouseButton1Click:Connect(Fire)
+                MainBtn.Activated:Connect(Fire)
 
-                if bind then
+                if bind and not isMobile then
                     local BindBtn = Instance.new("TextButton")
                     BindBtn.Size = UDim2.new(0, 40, 1, 0)
                     BindBtn.Position = UDim2.new(1, -40, 0, 0)
@@ -541,16 +592,25 @@ function Library:CreateWindow(title, wmText)
                 if current ~= min then pcall(callback, current) end
 
                 local isDragging = false
-                BG.MouseButton1Down:Connect(function() isDragging = true end)
-                UIS.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then isDragging = false end
+                
+                BG.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        isDragging = true
+                    end
                 end)
+                
+                UIS.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        isDragging = false
+                    end
+                end)
+                
                 UIS.InputChanged:Connect(function(input)
-                    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local mousePos = UIS:GetMouseLocation().X
+                    if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local positionX = input.Position.X
                         local sliderPos = BG.AbsolutePosition.X
                         local sliderSize = BG.AbsoluteSize.X
-                        local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+                        local percent = math.clamp((positionX - sliderPos) / sliderSize, 0, 1)
                         
                         local val = min + ((max - min) * percent)
                         val = math.floor((val / increment) + 0.5) * increment
@@ -561,12 +621,13 @@ function Library:CreateWindow(title, wmText)
                         local formatString = (increment % 1 == 0) and "%d/%d" or "%.1f/%.1f"
                         ValLabel.Text = string.format(formatString, val, max)
                         
-                        pcall(callback, val)
+                        local s, e = pcall(callback, val)
+                        if not s then warn("[Kral UI Error] Slider failed:", e) end
                     end
                 end)
             end
 
-            -- ==================== DROPDOWN (WITH SET & REFRESH) ====================
+            -- ==================== DROPDOWN ====================
             function GBData:CreateDropdown(options)
                 local DropData = {}
                 local name = options.Name or "Dropdown"
@@ -654,13 +715,14 @@ function Library:CreateWindow(title, wmText)
                         OptBtn.MouseEnter:Connect(function() OptBtn.TextColor3 = Theme.Accent end)
                         OptBtn.MouseLeave:Connect(function() OptBtn.TextColor3 = Theme.Text end)
                         
-                        OptBtn.MouseButton1Click:Connect(function()
+                        OptBtn.Activated:Connect(function()
                             MainBtn.Text = " " .. optionText
                             DropFrame.Visible = false
                             DropContainer.ZIndex = 5
                             Arrow.Text = "▼"
                             ActiveDropdown = nil
-                            pcall(callback, optionText)
+                            local s, e = pcall(callback, optionText)
+                            if not s then warn("[Kral UI Error] Dropdown failed:", e) end
                         end)
                     end
                 end
@@ -672,7 +734,7 @@ function Library:CreateWindow(title, wmText)
 
                 DropData:Refresh(list)
 
-                MainBtn.MouseButton1Click:Connect(function()
+                MainBtn.Activated:Connect(function()
                     local opening = not DropFrame.Visible
                     if ActiveDropdown and ActiveDropdown ~= DropFrame then
                         ActiveDropdown.Visible = false
@@ -740,7 +802,7 @@ function Library:CreateWindow(title, wmText)
                 PopPadding.Parent = Popup
 
                 local isOpen = false
-                ColorDisplay.MouseButton1Click:Connect(function()
+                ColorDisplay.Activated:Connect(function()
                     isOpen = not isOpen
                     Popup.Visible = isOpen
                     CPContainer.ZIndex = isOpen and 75 or 1
@@ -802,7 +864,8 @@ function Library:CreateWindow(title, wmText)
                     
                     SVIndicator.Position = UDim2.new(currentHSV[2], 0, 1 - currentHSV[3], 0)
                     HueIndicator.Position = UDim2.new(currentHSV[1], 0, 0.5, 0)
-                    pcall(callback, col)
+                    local s, e = pcall(callback, col)
+                    if not s then warn("[Kral UI Error] ColorPicker failed:", e) end
                 end
 
                 SetColor()
@@ -820,7 +883,7 @@ function Library:CreateWindow(title, wmText)
                 end
 
                 SatValGrid.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         isSatValDragging = true
                         UpdateSatVal(input)
                     end
@@ -834,21 +897,21 @@ function Library:CreateWindow(title, wmText)
                 end
 
                 HueBar.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         isHueDragging = true
                         UpdateHue(input)
                     end
                 end)
 
                 UIS.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         isSatValDragging = false
                         isHueDragging = false
                     end
                 end)
 
                 UIS.InputChanged:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
                         if isSatValDragging then
                             UpdateSatVal(input)
                         elseif isHueDragging then
@@ -891,7 +954,7 @@ function Library:CreateWindow(title, wmText)
                 BindBtn.Parent = BContainer
 
                 local isListening = false
-                BindBtn.MouseButton1Click:Connect(function()
+                BindBtn.Activated:Connect(function()
                     BindBtn.Text = "[...]"
                     isListening = true
                 end)
@@ -904,11 +967,13 @@ function Library:CreateWindow(title, wmText)
                         else
                             bind = input.KeyCode.Name
                             BindBtn.Text = "[" .. bind .. "]"
-                            pcall(callback, bind)
+                            local s, e = pcall(callback, bind)
+                            if not s then warn("[Kral UI Error] Keybind failed:", e) end
                         end
                         isListening = false
                     elseif not gameProcessed and not isListening and bind and input.KeyCode.Name == bind then
-                        pcall(callback, bind)
+                        local s, e = pcall(callback, bind)
+                        if not s then warn("[Kral UI Error] Keybind trigger failed:", e) end
                     end
                 end)
             end
